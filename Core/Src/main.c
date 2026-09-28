@@ -377,7 +377,7 @@ int main(void)
 	lcd_put_cur(0, 0);
 	lcd_send_string("BOOT SYSTEM?");
 	lcd_put_cur(1, 0);
-	lcd_send_string("1. YES  3. NO");
+	lcd_send_string("1. YES");
 	/* --- Keypad: the PIN gate comes first ---
 	 * Placed before the sensor is started, so nothing is acquired until the
 	 * PIN is accepted and the sensor LEDs stay dark while unauthorised. */
@@ -393,7 +393,18 @@ int main(void)
 	Panel_SetLed(1, 0);
 	Panel_SetLed(2, 0);
 	Panel_SetLed(3, 0);
-	wait_for_password();
+	if (Keypad_Scan() == '1') {
+		lcd_put_cur(0, 0);
+		lcd_send_string("BOOTING...");
+		lcd_put_cur(1, 0);
+		lcd_send_string("");
+		HAL_Delay(1000);
+	}
+	lcd_put_cur(0, 0);
+	lcd_send_string("SYSTEM IDLE");
+	lcd_put_cur(1, 0);
+	lcd_send_string("ALL CLEAR");
+	/*#####wait_for_password();*/
 	/* --- Heart rate sensor on I2C3 --- */
 	{
 		uint8_t addr = Oxi_ScanBus(&hi2c3); /* break here; expect 0xAE */

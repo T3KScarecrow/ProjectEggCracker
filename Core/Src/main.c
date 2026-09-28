@@ -214,6 +214,18 @@ static void build_lines(DispState st, uint8_t comm_ok, float temp, uint8_t spin,
 	pad16(l1);
 	pad16(l2);
 }
+
+/* App display modes enum, real*/
+typedef enum {
+		APP_WAIT_START,
+		APP_MONITORING,
+		APP_ALERT,
+		APP_MENU,
+		APP_STAT,
+		APP_PATIENT_INFO,
+		APP_ADDRESS,
+		APP_CPR
+	} AppState;
 /* ==========================================================================
  * Power-on PIN
  *
@@ -221,6 +233,24 @@ static void build_lines(DispState st, uint8_t comm_ok, float temp, uint8_t spin,
  * loop is enough and no state machine is needed. It runs once per power-up;
  * after that the main loop never touches the keypad again.
  * ========================================================================== */
+static void wait_for_start(void) {
+	for (;;) {
+		char key = Keypad_Scan();
+		if (key == '1') {
+		return;
+		}
+
+		HAL_Delay(PIN_SCAN_MS);
+	}
+}
+
+static void add_event_code(const char *code);
+static uint8_t accident_detected(void) {
+	return (event_flags & (EVENT_IRREGULAR | EVENT_MANUAL)) != 0u;
+}
+static void clear_event_codes(void);
+static void Panel_GetPressed(void);
+
 static void wait_for_password(void) {
 #if KEYPAD_LEARN_MODE
 /* ---- Learn mode: no PIN check, just show which pin pair was pressed.
@@ -393,18 +423,18 @@ int main(void)
 	Panel_SetLed(1, 0);
 	Panel_SetLed(2, 0);
 	Panel_SetLed(3, 0);
-	if (Keypad_Scan() == '1') {
-		lcd_put_cur(0, 0);
-		lcd_send_string("BOOTING...");
-		lcd_put_cur(1, 0);
-		lcd_send_string("");
-		HAL_Delay(1000);
-	}
+	wait_for_start();
+	lcd_put_cur(0, 0);
+	lcd_send_string("BOOTING...");
+	lcd_put_cur(1, 0);
+	lcd_send_string("");
+	HAL_Delay(1000);
 	lcd_put_cur(0, 0);
 	lcd_send_string("SYSTEM IDLE");
 	lcd_put_cur(1, 0);
 	lcd_send_string("ALL CLEAR");
 	/*#####wait_for_password();*/
+	
 	/* --- Heart rate sensor on I2C3 --- */
 	{
 		uint8_t addr = Oxi_ScanBus(&hi2c3); /* break here; expect 0xAE */
@@ -433,41 +463,107 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  uint8_t ok;
-	  float temp;
-	  DispState st;
-	  ok = (Oxi_Read(&rd) == HAL_OK) ? 1u : 0u;
-	  temp = ok ? Oxi_ReadTemperature() : -100.0f;
-	  st = ok ? hr_step(rd.heartbeat, rd.spo2) : ST_NO_FINGER;
-	  build_lines(st, ok, temp, spin, line1, line2);
-	  /* Write to the LCD only when the text actually changed. This is what
-	  * makes fast polling practical: the screen may stay still for seconds,
-	  * so there is no flicker and almost no traffic on I2C1. */
-	  if (strncmp(prev1, line1, 16) != 0) {
-	  lcd_put_cur(0, 0);
-	  lcd_send_string(line1);
-	  strncpy(prev1, line1, sizeof(prev1));
-	  }
-	  if (strncmp(prev2, line2, 16) != 0) {
-	  lcd_put_cur(1, 0);
-	  lcd_send_string(line2);
-	  strncpy(prev2, line2, sizeof(prev2));
-	  }
-	  spin++;
-	  /* The heart rate display only needs refreshing every 250 ms, but the
-	  * buttons must be polled far more often to feel responsive. So the wait
-	  * is split into 10 ms slices with a button scan in each. Pressing
-	  * BUTTONn toggles LEDn without disturbing the readings. */
-	  {
-	  uint16_t t;
-	  for (t = 0; t < (POLL_MS / PANEL_TICK_MS); t++)
-	  {
-	  Panel_Task();
-	  HAL_Delay(PANEL_TICK_MS);
-	  }
-	  }
-	  }
+	char key = Keypad_Scan();
+	Pane_Task();
+	uint8_t pressed = Panel_GetPressed();
+
+	if (pressed != 0u && app_state == APP_MONITORING) {
+		add_event_code("MANUAL");
+		event_flags |= EVENT_MANUAL;
+	}
+
+	if (time_to_read_oximeter() && app_state == APP_MONITORING) {
+		OxiReading reading;
+
+		if (Oxi_Read(&reading) == HAL_OK) {
+			update_irregularity(reading.heartbeat);
+			
+			if (accident_detected()) {
+				enter_alert_state();
+			}
+			// Handle read error
+		}
+	}
+
+	switch (app_state) {
+	case APP_WAIT_START:
+		// Handle wait start state
+		break;
+
+	case APP_MONITORING:
+		// Handle monitoring state
+		show_monitor();
+		break;
+
+	case APP_ALERT:
+		// Handle alert state
+		update_alert_display();
+		update_alert_leds();
+		handle_alert_key(key);
+		break;
+
+	case APP_MENU:
+		// Handle menu state
+		show_menu();
+		break;
+
+	case APP_STAT:
+		// Handle stat state
+		show_stat();
+		break;
+
+	case APP_PATIENT_INFO:
+		// Handle patient info state
+		show_patient_info();
+		break;
+
+	case APP_ADDRESS:
+		// Handle address state
+		show_address();
+		break;
+	
+	case APP_CPR:
+		// Handle CPR state
+		show_cpr();
+		break;
+	}
+
+	//   uint8_t ok;
+	//   float temp;
+	//   DispState st;
+	//   ok = (Oxi_Read(&rd) == HAL_OK) ? 1u : 0u;
+	//   temp = ok ? Oxi_ReadTemperature() : -100.0f;
+	//   st = ok ? hr_step(rd.heartbeat, rd.spo2) : ST_NO_FINGER;
+	//   build_lines(st, ok, temp, spin, line1, line2);
+	//   /* Write to the LCD only when the text actually changed. This is what
+	//   * makes fast polling practical: the screen may stay still for seconds,
+	//   * so there is no flicker and almost no traffic on I2C1. */
+	//   if (strncmp(prev1, line1, 16) != 0) {
+	//   lcd_put_cur(0, 0);
+	//   lcd_send_string(line1);
+	//   strncpy(prev1, line1, sizeof(prev1));
+	//   }
+	//   if (strncmp(prev2, line2, 16) != 0) {
+	//   lcd_put_cur(1, 0);
+	//   lcd_send_string(line2);
+	//   strncpy(prev2, line2, sizeof(prev2));
+	//   }
+	//   spin++;
+	//   /* The heart rate display only needs refreshing every 250 ms, but the
+	//   * buttons must be polled far more often to feel responsive. So the wait
+	//   * is split into 10 ms slices with a button scan in each. Pressing
+	//   * BUTTONn toggles LEDn without disturbing the readings. */
+	//   {
+	//   uint16_t t;
+	//   for (t = 0; t < (POLL_MS / PANEL_TICK_MS); t++)
+	//   {
+	//   Panel_Task();
+	//   HAL_Delay(PANEL_TICK_MS);
+	//   }
+	//   }
+	//   }
   /* USER CODE END 3 */
+	}
 }
 
 /**

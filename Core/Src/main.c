@@ -368,6 +368,47 @@ HAL_Delay(PIN_SCAN_MS);
 	}
 #endif
 }
+
+/* Functions for menu states, each shows information relating
+* to the patient to help with their care such as their address
+* their current heart rate and SpO2 and so on */
+void show_monitor() {
+	// show monitor code
+}
+
+void show_menu() {
+	// show menu code
+	char menu_line_1[16] = "1.STAT 2.P.INFO";
+	char menu_line_2[16] = "3.ADDR 4.CPR";
+	lcd_put_cur(0,0);
+	lcd_send_string(menu_line_1);
+	lcd_put_cur(1,0);
+	lcd_send_string(menu_line_2);
+}
+
+void show_stat() {
+	// show stat code
+}
+
+void show_patient_info() {
+	char patient_name[16] = "Stanley Leichter";
+	char patient_age[7] = "AGE: 68";
+	lcd_put_cur(0,0);
+	lcd_send_string(patient_name);
+	lcd_put_cur(0,10);
+	lcd_send_string(patient_age);
+}
+
+void show_address() {
+	// show address code
+	// hardcoding it until I learn how to do it better
+	char address_line_1[16] = "Bldg 420, 3/Kent";
+	char address_line_2[16] = "St, Bentley";
+	lcd_put_cur(0, 0);
+	lcd_send_string(address_line_1);
+	lcd_put_cur(1, 0);
+	lcd_send_string(address_line_2);
+}
 /* USER CODE END 0 */
 
 /**

@@ -219,7 +219,7 @@ static void build_lines(DispState st, uint8_t comm_ok, float temp, uint8_t spin,
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* App display modes enum, real*/
 typedef enum {
-		APP_WAIT_START,
+		//APP_WAIT_START,
 		APP_MONITORING,
 		APP_ALERT,
 		APP_MENU,
@@ -386,6 +386,13 @@ HAL_Delay(PIN_SCAN_MS);
 * their current heart rate and SpO2 and so on */
 void show_monitor() {
 	// show monitor code
+	char monitor_line_1[16] = "All Clear";
+	char monitor_line_2[16] = "System Idle...";
+	lcd_put_cur(0,0);
+	lcd_send_string(monitor_line_1);
+	lcd_put_cur(1,0);
+	lcd_send_string(monitor_line_2);
+	
 }
 
 void show_menu() {
@@ -420,6 +427,14 @@ void show_address() {
 	lcd_send_string(address_line_1);
 	lcd_put_cur(1, 0);
 	lcd_send_string(address_line_2);
+}
+
+void show_cpr() {
+	// show cpr code
+	// Needs to change screen and flash LEDs
+	char cpr_line_1[16] = ""
+	char cpr_line_2[16] = ""
+	
 }
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -542,9 +557,9 @@ int main(void)
 	}
 
 	switch (app_state) {
-	case APP_WAIT_START:
-		// Handle wait start state
-		break;
+	// case APP_WAIT_START:
+	// 	// Handle wait start state
+	// 	break; // I don't think we need this because the function for it already happens in main, before the while.
 
 	case APP_MONITORING:
 		// Handle monitoring state

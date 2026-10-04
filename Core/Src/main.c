@@ -215,6 +215,8 @@ static void build_lines(DispState st, uint8_t comm_ok, float temp, uint8_t spin,
 	pad16(l2);
 }
 
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* App display modes enum, real*/
 typedef enum {
 		APP_WAIT_START,
@@ -226,6 +228,9 @@ typedef enum {
 		APP_ADDRESS,
 		APP_CPR
 	} AppState;
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
 /* ==========================================================================
  * Power-on PIN
  *
@@ -233,7 +238,10 @@ typedef enum {
  * loop is enough and no state machine is needed. It runs once per power-up;
  * after that the main loop never touches the keypad again.
  * ========================================================================== */
-static void wait_for_start(void) {
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+ static void wait_for_start(void) {
 	for (;;) {
 		char key = Keypad_Scan();
 		if (key == '1') {
@@ -250,6 +258,8 @@ static uint8_t accident_detected(void) {
 }
 static void clear_event_codes(void);
 static void Panel_GetPressed(void);
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 static void wait_for_password(void) {
 #if KEYPAD_LEARN_MODE
@@ -369,6 +379,8 @@ HAL_Delay(PIN_SCAN_MS);
 #endif
 }
 
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Functions for menu states, each shows information relating
 * to the patient to help with their care such as their address
 * their current heart rate and SpO2 and so on */
@@ -395,7 +407,7 @@ void show_patient_info() {
 	char patient_age[7] = "AGE: 68";
 	lcd_put_cur(0,0);
 	lcd_send_string(patient_name);
-	lcd_put_cur(0,10);
+	lcd_put_cur(1,10); //Goddamn loser
 	lcd_send_string(patient_age);
 }
 
@@ -409,6 +421,9 @@ void show_address() {
 	lcd_put_cur(1, 0);
 	lcd_send_string(address_line_2);
 }
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
 /* USER CODE END 0 */
 
 /**

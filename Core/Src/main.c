@@ -420,11 +420,11 @@ void show_patient_info() {
 
 void show_address() {
 	// show address code
-	// hardcoding it until I learn how to do it better
 	// attempting to code it better
+	// for loop logic worked in an external editor
 	char full_address[32] = "Bldg 420, 3/Kent St, Bentley";
-	char address_line_1[16];
-	char address_line_2[16];
+	char address_line_1[17];
+	char address_line_2[17];
 	for(int i = 0; i<16; i++){
 		address_line_1[i]=full_address[i];
 		address_line_2[i]=full_address[i+16];
@@ -438,8 +438,26 @@ void show_address() {
 void show_cpr() {
 	// show cpr code
 	// Needs to change screen and flash LEDs
-	char cpr_line_1[16] = ""
-	char cpr_line_2[16] = ""
+	//jagged array containing all three screens of text for the cpr mode
+	char cpr_screen[3][32] = {"COMPRESS IN TIME WITH LIGHTS","CALL 000 IF CPR NEEDED","PRESS 4 TO GO BACK"};
+	
+	char cpr_line_1[17];
+	char cpr_line_2[17];
+	//set the lines to be printed to the lcd
+	for(int i = 0; i<3; i++){
+		for(int j = 0; j<16; j++){
+			cpr_line_1[j]=cpr_screen[i][j];
+			cpr_line_2[j]=cpr_screen[i][j+16];
+		}
+		lcd_put_cur(0, 0);
+		lcd_send_string(cpr_line_1);
+		lcd_put_cur(1, 0);
+		lcd_send_string(cpr_line_2);
+		HAL_Delay(2000);
+		if(i == 3){
+			i = 0;
+		}
+	}
 	
 }
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

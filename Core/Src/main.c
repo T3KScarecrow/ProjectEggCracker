@@ -421,8 +421,14 @@ void show_patient_info() {
 void show_address() {
 	// show address code
 	// hardcoding it until I learn how to do it better
-	char address_line_1[16] = "Bldg 420, 3/Kent";
-	char address_line_2[16] = "St, Bentley";
+	// attempting to code it better
+	char full_address[32] = "Bldg 420, 3/Kent St, Bentley";
+	char address_line_1[16];
+	char address_line_2[16];
+	for(int i = 0; i<16; i++){
+		address_line_1[i]=full_address[i];
+		address_line_2[i]=full_address[i+16];
+	}
 	lcd_put_cur(0, 0);
 	lcd_send_string(address_line_1);
 	lcd_put_cur(1, 0);

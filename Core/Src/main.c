@@ -252,12 +252,12 @@ typedef enum {
 	}
 }
 
-static void add_event_code(const char *code);
-static uint8_t accident_detected(void) {
-	return (event_flags & (EVENT_IRREGULAR | EVENT_MANUAL)) != 0u;
-}
-static void clear_event_codes(void);
-static void Panel_GetPressed(void);
+//static void add_event_code(const char *code);
+//static uint8_t accident_detected(void) {
+//	return (event_flags & (EVENT_IRREGULAR | EVENT_MANUAL)) != 0u;
+//}
+//static void clear_event_codes(void);
+//static void Panel_GetPressed(void);
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
@@ -388,6 +388,7 @@ void show_monitor() {
 	// show monitor code
 	char monitor_line_1[16] = "All Clear";
 	char monitor_line_2[16] = "System Idle...";
+	lcd_clear();
 	lcd_put_cur(0,0);
 	lcd_send_string(monitor_line_1);
 	lcd_put_cur(1,0);
@@ -399,6 +400,7 @@ void show_menu() {
 	// show menu code
 	char menu_line_1[16] = "1.STAT 2.P.INFO";
 	char menu_line_2[16] = "3.ADDR 4.CPR";
+	lcd_clear();
 	lcd_put_cur(0,0);
 	lcd_send_string(menu_line_1);
 	lcd_put_cur(1,0);
@@ -412,9 +414,10 @@ void show_stat() {
 void show_patient_info() {
 	char patient_name[16] = "Stanley Leichter";
 	char patient_age[7] = "AGE: 68";
+	lcd_clear();
 	lcd_put_cur(0,0);
 	lcd_send_string(patient_name);
-	lcd_put_cur(1,10); //Goddamn loser
+	lcd_put_cur(1,9); //Goddamn loser
 	lcd_send_string(patient_age);
 }
 
@@ -429,6 +432,7 @@ void show_address() {
 		address_line_1[i]=full_address[i];
 		address_line_2[i]=full_address[i+16];
 	}
+	lcd_clear();
 	lcd_put_cur(0, 0);
 	lcd_send_string(address_line_1);
 	lcd_put_cur(1, 0);
@@ -439,7 +443,7 @@ void show_cpr() {
 	// show cpr code
 	// Needs to change screen and flash LEDs
 	//jagged array containing all three screens of text for the cpr mode
-	char cpr_screen[3][32] = {"COMPRESS IN TIME WITH LIGHTS","CALL 000 IF CPR NEEDED","PRESS 4 TO GO BACK"};
+	char cpr_screen[3][32] = {"COMPRESS IN TIME WITH LIGHTS","CALL 000 IF CPR NEEDED","PRESS 4 TO GO   BACK"};
 	
 	char cpr_line_1[17];
 	char cpr_line_2[17];
@@ -449,6 +453,7 @@ void show_cpr() {
 			cpr_line_1[j]=cpr_screen[i][j];
 			cpr_line_2[j]=cpr_screen[i][j+16];
 		}
+		lcd_clear();
 		lcd_put_cur(0, 0);
 		lcd_send_string(cpr_line_1);
 		lcd_put_cur(1, 0);
@@ -528,6 +533,16 @@ int main(void)
 	lcd_send_string("SYSTEM IDLE");
 	lcd_put_cur(1, 0);
 	lcd_send_string("ALL CLEAR");
+	show_monitor();
+	  HAL_Delay(4000);
+	  show_menu();
+	  HAL_Delay(4000);
+	  show_patient_info();
+	  HAL_Delay(4000);
+	  show_address();
+	  HAL_Delay(4000);
+	  show_cpr();
+	  HAL_Delay(4000);
 	/*#####wait_for_password();*/
 	
 	/* --- Heart rate sensor on I2C3 --- */
@@ -552,115 +567,116 @@ int main(void)
   char line1[17], line2[17];
   char prev1[17] = "", prev2[17] = "";
   uint8_t spin = 0;
-  while (1)
-  {
 
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
-	char key = Keypad_Scan();
-	Pane_Task();
-	uint8_t pressed = Panel_GetPressed();
-
-	if (pressed != 0u && app_state == APP_MONITORING) {
-		add_event_code("MANUAL");
-		event_flags |= EVENT_MANUAL;
-	}
-
-	if (time_to_read_oximeter() && app_state == APP_MONITORING) {
-		OxiReading reading;
-
-		if (Oxi_Read(&reading) == HAL_OK) {
-			update_irregularity(reading.heartbeat);
-			
-			if (accident_detected()) {
-				enter_alert_state();
-			}
-			// Handle read error
-		}
-	}
-
-	switch (app_state) {
-	// case APP_WAIT_START:
-	// 	// Handle wait start state
-	// 	break; // I don't think we need this because the function for it already happens in main, before the while.
-
-	case APP_MONITORING:
-		// Handle monitoring state
-		show_monitor();
-		break;
-
-	case APP_ALERT:
-		// Handle alert state
-		update_alert_display();
-		update_alert_leds();
-		handle_alert_key(key);
-		break;
-
-	case APP_MENU:
-		// Handle menu state
-		show_menu();
-		break;
-
-	case APP_STAT:
-		// Handle stat state
-		show_stat();
-		break;
-
-	case APP_PATIENT_INFO:
-		// Handle patient info state
-		show_patient_info();
-		break;
-
-	case APP_ADDRESS:
-		// Handle address state
-		show_address();
-		break;
-	
-	case APP_CPR:
-		// Handle CPR state
-		show_cpr();
-		break;
-	}
-
-	//   uint8_t ok;
-	//   float temp;
-	//   DispState st;
-	//   ok = (Oxi_Read(&rd) == HAL_OK) ? 1u : 0u;
-	//   temp = ok ? Oxi_ReadTemperature() : -100.0f;
-	//   st = ok ? hr_step(rd.heartbeat, rd.spo2) : ST_NO_FINGER;
-	//   build_lines(st, ok, temp, spin, line1, line2);
-	//   /* Write to the LCD only when the text actually changed. This is what
-	//   * makes fast polling practical: the screen may stay still for seconds,
-	//   * so there is no flicker and almost no traffic on I2C1. */
-	//   if (strncmp(prev1, line1, 16) != 0) {
-	//   lcd_put_cur(0, 0);
-	//   lcd_send_string(line1);
-	//   strncpy(prev1, line1, sizeof(prev1));
-	//   }
-	//   if (strncmp(prev2, line2, 16) != 0) {
-	//   lcd_put_cur(1, 0);
-	//   lcd_send_string(line2);
-	//   strncpy(prev2, line2, sizeof(prev2));
-	//   }
-	//   spin++;
-	//   /* The heart rate display only needs refreshing every 250 ms, but the
-	//   * buttons must be polled far more often to feel responsive. So the wait
-	//   * is split into 10 ms slices with a button scan in each. Pressing
-	//   * BUTTONn toggles LEDn without disturbing the readings. */
-	//   {
-	//   uint16_t t;
-	//   for (t = 0; t < (POLL_MS / PANEL_TICK_MS); t++)
-	//   {
-	//   Panel_Task();
-	//   HAL_Delay(PANEL_TICK_MS);
-	//   }
-	//   }
-	//   }
-  /* USER CODE END 3 */
-	}
+//  while (1)
+//  {
+//
+//    /* USER CODE END WHILE */
+//
+//    /* USER CODE BEGIN 3 */
+//	char key = Keypad_Scan();
+//	Pane_Task();
+//	uint8_t pressed = Panel_GetPressed();
+//
+//	if (pressed != 0u && app_state == APP_MONITORING) {
+//		add_event_code("MANUAL");
+//		event_flags |= EVENT_MANUAL;
+//	}
+//
+//	if (time_to_read_oximeter() && app_state == APP_MONITORING) {
+//		OxiReading reading;
+//
+//		if (Oxi_Read(&reading) == HAL_OK) {
+//			update_irregularity(reading.heartbeat);
+//
+//			if (accident_detected()) {
+//				enter_alert_state();
+//			}
+//			// Handle read error
+//		}
+//	}
+//
+//	switch (app_state) {
+//	// case APP_WAIT_START:
+//	// 	// Handle wait start state
+//	// 	break; // I don't think we need this because the function for it already happens in main, before the while.
+//
+//	case APP_MONITORING:
+//		// Handle monitoring state
+//		show_monitor();
+//		break;
+//
+//	case APP_ALERT:
+//		// Handle alert state
+//		update_alert_display();
+//		update_alert_leds();
+//		handle_alert_key(key);
+//		break;
+//
+//	case APP_MENU:
+//		// Handle menu state
+//		show_menu();
+//		break;
+//
+//	case APP_STAT:
+//		// Handle stat state
+//		show_stat();
+//		break;
+//
+//	case APP_PATIENT_INFO:
+//		// Handle patient info state
+//		show_patient_info();
+//		break;
+//
+//	case APP_ADDRESS:
+//		// Handle address state
+//		show_address();
+//		break;
+//
+//	case APP_CPR:
+//		// Handle CPR state
+//		show_cpr();
+//		break;
+//	}
+//
+//	//   uint8_t ok;
+//	//   float temp;
+//	//   DispState st;
+//	//   ok = (Oxi_Read(&rd) == HAL_OK) ? 1u : 0u;
+//	//   temp = ok ? Oxi_ReadTemperature() : -100.0f;
+//	//   st = ok ? hr_step(rd.heartbeat, rd.spo2) : ST_NO_FINGER;
+//	//   build_lines(st, ok, temp, spin, line1, line2);
+//	//   /* Write to the LCD only when the text actually changed. This is what
+//	//   * makes fast polling practical: the screen may stay still for seconds,
+//	//   * so there is no flicker and almost no traffic on I2C1. */
+//	//   if (strncmp(prev1, line1, 16) != 0) {
+//	//   lcd_put_cur(0, 0);
+//	//   lcd_send_string(line1);
+//	//   strncpy(prev1, line1, sizeof(prev1));
+//	//   }
+//	//   if (strncmp(prev2, line2, 16) != 0) {
+//	//   lcd_put_cur(1, 0);
+//	//   lcd_send_string(line2);
+//	//   strncpy(prev2, line2, sizeof(prev2));
+//	//   }
+//	//   spin++;
+//	//   /* The heart rate display only needs refreshing every 250 ms, but the
+//	//   * buttons must be polled far more often to feel responsive. So the wait
+//	//   * is split into 10 ms slices with a button scan in each. Pressing
+//	//   * BUTTONn toggles LEDn without disturbing the readings. */
+//	//   {
+//	//   uint16_t t;
+//	//   for (t = 0; t < (POLL_MS / PANEL_TICK_MS); t++)
+//	//   {
+//	//   Panel_Task();
+//	//   HAL_Delay(PANEL_TICK_MS);
+//	//   }
+//	//   }
+//	//   }
+//  /* USER CODE END 3 */
+//	}
+//}
 }
-
 /**
   * @brief System Clock Configuration
   * @retval None

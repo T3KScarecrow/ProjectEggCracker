@@ -79,6 +79,10 @@ static uint8_t s_stable[PANEL_N]; /* confirmed level: 1 released, 0 pressed */
 static uint8_t s_count[PANEL_N]; /* how many equal samples in a row */
 static uint8_t s_cand[PANEL_N]; /* candidate level */
 static uint8_t s_leds; /* LED states, bit0 = LED0 */
+
+// USER STUFF
+static bool manual_activation = false;
+
 static void led_write(uint8_t i, uint8_t on) {
 #if PANEL_LED_ACTIVE_HIGH
 	HAL_GPIO_WritePin(LED_PORT[i], LED_MASK[i],
@@ -137,18 +141,25 @@ void Panel_Task(void) {
 #else
 	uint8_t i;
 	for (i = 0; i < PANEL_N; i++) {
-		uint8_t now =
-				(HAL_GPIO_ReadPin(BTN_PORT[i], BTN_MASK[i]) == GPIO_PIN_RESET) ?
-						(uint8_t) 0u /* low = pressed */
-						:
-						(uint8_t) 1u;
-		/* Debug: record the raw level for the Live Expressions view */
-		if (now) {
-			g_panel_btn_raw = (uint8_t) (g_panel_btn_raw | (uint8_t) (1u << i));
-		} else {
-			g_panel_btn_raw =
-					(uint8_t) (g_panel_btn_raw & (uint8_t) ~(1u << i));
+		if (i == 0) { // BUTTON0 is for the MANUAL ACTIVATION event alert thing.
+			if (manual_activation == false) {
+				uint8_t now =  // so don't do any number that isn't 1.
+					(HAL_GPIO_ReadPin(BTN_PORT[i], BTN_MASK[i]) == GPIO_PIN_RESET) ?
+							(uint8_t) 0u /* low = pressed */
+							:
+							(uint8_t) 1u;
+				/* Debug: record the raw level for the Live Expressions view */
+				if (now) {
+					g_panel_btn_raw = (uint8_t) (g_panel_btn_raw | (uint8_t) (1u << i));
+				} 
+				else {
+					g_panel_btn_raw =
+							(uint8_t) (g_panel_btn_raw & (uint8_t) ~(1u << i));
+				}
+				manual_activation = true;
+			}
 		}
+		
 #if PANEL_DEBUG_MIRROR
 /* Mirror mode: the LED follows the raw level, with no debouncing,
 * no edge detection and no toggling. Shows whether the pin level

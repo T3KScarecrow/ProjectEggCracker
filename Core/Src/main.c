@@ -217,9 +217,11 @@ static void build_lines(DispState st, uint8_t comm_ok, float temp, uint8_t spin,
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+// ENUM ZONE ENUM ZONE ENUM ZONE ENUM ZONE //
 /* App display modes enum, real*/
 typedef enum {
 		//APP_WAIT_START,
+		APP_NO_FINGER_WARNING,
 		APP_MONITORING,
 		APP_ALERT,
 		APP_MENU,
@@ -228,6 +230,50 @@ typedef enum {
 		APP_ADDRESS,
 		APP_CPR
 	} AppState;
+
+/* Event flag enum*/	
+typedef enum {
+	    EVENT_NONE = 0u,
+	    EVENT_IRREGULAR = 1u << 0u,
+		EVENT_MANUAL = 1u << 1u
+	} EventFlags;
+
+/* CPR phase enum*/
+typedef enum {
+	CPR_COMPRESS,
+	CPR_RELAX,
+	CPR_BREATHE,
+} CPRPhase;
+
+
+// VARIABLE ZONE VARIABLE ZONE VARIABLE ZONE VARIABLE ZONE //
+static uint32_t cpr_phase_start_ms = 0;
+static CPRPhase cpr_phase = CPR_COMPRESS;
+static uint8_t cpr_screen_index = 0;
+static uint32_t cpr_screen_switch_ms = 0;
+static uint8_t cpr_breath_screen_active = 0;
+static uint8_t cpr_compressions_since_breath = 0u;
+
+static const char *cpr_screen_text[6] = {
+	"COMPRESS IN TIME"
+	"WITH LIGHTS",
+	"CALL 000 IF CPR",
+	"NEEDED",
+	"PRESS # TO GO",
+	"BACK"
+};
+static const char *cpr_breath_screen_text1 = "BREATHE 2 RESCUE";
+static const char *cpr_breath_screen_text2 "BREATHS";
+static const char monitor_line_1[16] = "All Clear";
+static const char monitor_line_2[16] = "System Idle...";
+static const char warning_line_1[16] = "No Finger Found";
+static const char warning_line_2[16] = "Place on Finger";
+static const char menu_line_1[16] = "1.STAT 2.P.INFO";
+static const char menu_line_2[16] = "3.ADDR 4.CPR";
+static const char patient_name[16] = "Stanley Leichter";
+static const char patient_age[7] = "AGE: 68";
+static const char full_address[32] = "Bldg 420, 3/Kent St, Bentley";
+
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
@@ -241,7 +287,8 @@ typedef enum {
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
- static void wait_for_start(void) {
+// THE FUNCTIONS FUNCTION THE FUNCTIONS FUNCTION //
+static void wait_for_start(void) {
 	for (;;) {
 		char key = Keypad_Scan();
 		if (key == '1') {
@@ -252,12 +299,17 @@ typedef enum {
 	}
 }
 
-//static void add_event_code(const char *code);
-//static uint8_t accident_detected(void) {
-//	return (event_flags & (EVENT_IRREGULAR | EVENT_MANUAL)) != 0u;
-//}
-//static void clear_event_codes(void);
-//static void Panel_GetPressed(void);
+static bool accident_detected(void) {
+	return (event_flags != EVENT_NONE);
+}
+static void clear_event_codes(void) {
+	event_flags = EVENT_NONE;
+}
+
+static void cpr_leds(uint8_t on) {
+	Panel_SetLed(2, on);
+	Panel_SetLed(3, on);
+}
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
@@ -384,7 +436,9 @@ HAL_Delay(PIN_SCAN_MS);
 /* Functions for menu states, each shows information relating
 * to the patient to help with their care such as their address
 * their current heart rate and SpO2 and so on */
-void show_monitor() {
+// SHOW ZONE SHOW ZONE SHOW ZONE SHOW ZONE SHOW ZONE //
+
+static void show_monitor(void) {
 	// show monitor code
 	char monitor_line_1[16] = "All Clear";
 	char monitor_line_2[16] = "System Idle...";
@@ -396,10 +450,17 @@ void show_monitor() {
 	
 }
 
-void show_menu() {
+static void show_no_finger_warning(void) {
+	// show no finger warning code
+	lcd_clear();
+	lcd_put_cur(0,0);
+	lcd_send_string(warning_line_1);
+	lcd_put_cur(1,0);
+	lcd_send_string(warning_line_2);
+}
+
+static void show_menu(void) {
 	// show menu code
-	char menu_line_1[16] = "1.STAT 2.P.INFO";
-	char menu_line_2[16] = "3.ADDR 4.CPR";
 	lcd_clear();
 	lcd_put_cur(0,0);
 	lcd_send_string(menu_line_1);
@@ -407,13 +468,13 @@ void show_menu() {
 	lcd_send_string(menu_line_2);
 }
 
-void show_stat() {
+static void show_stat(void) {
 	// show stat code
+
 }
 
-void show_patient_info() {
-	char patient_name[16] = "Stanley Leichter";
-	char patient_age[7] = "AGE: 68";
+static void show_patient_info(void) {
+	// show patient info code
 	lcd_clear();
 	lcd_put_cur(0,0);
 	lcd_send_string(patient_name);
@@ -421,11 +482,11 @@ void show_patient_info() {
 	lcd_send_string(patient_age);
 }
 
-void show_address() {
+static void show_address(void) {
 	// show address code
 	// attempting to code it better
 	// for loop logic worked in an external editor
-	char full_address[32] = "Bldg 420, 3/Kent St, Bentley";
+
 	char address_line_1[17];
 	char address_line_2[17];
 	for(int i = 0; i<16; i++){
@@ -439,31 +500,37 @@ void show_address() {
 	lcd_send_string(address_line_2);
 }
 
-void show_cpr() {
+static void show_cpr(void) {
 	// show cpr code
 	// Needs to change screen and flash LEDs
-	//jagged array containing all three screens of text for the cpr mode
-	char cpr_screen[3][32] = {"COMPRESS IN TIME WITH LIGHTS","CALL 000 IF CPR NEEDED","PRESS 4 TO GO   BACK"};
-	
-	char cpr_line_1[17];
-	char cpr_line_2[17];
-	//set the lines to be printed to the lcd
-	for(int i = 0; i<3; i++){
-		for(int j = 0; j<16; j++){
-			cpr_line_1[j]=cpr_screen[i][j];
-			cpr_line_2[j]=cpr_screen[i][j+16];
-		}
+	// jagged array containing all three screens of text for the cpr mode
+	uint32_t now_time = HAL_GetTick();
+
+	if (cpr_breath_screen_active) {
 		lcd_clear();
 		lcd_put_cur(0, 0);
-		lcd_send_string(cpr_line_1);
+		lcd_send_string(cpr_breath_screen_text1);
 		lcd_put_cur(1, 0);
-		lcd_send_string(cpr_line_2);
-		HAL_Delay(2000);
-		if(i == 3){
-			i = 0;
-		}
+		lcd_send_string(cpr_breath_screen_text2);
+		return;
 	}
-	
+
+	if (HAL_GetTick() - cpr_screen_switch_ms >= 4000u) {
+		cpr_screen_switch_ms = HAL_GetTick();
+		cpr_screen_index = (cpr_screen_index + 2u) % 6u;
+	}
+	// char cpr_line_1[17];
+	// char cpr_line_2[17];
+	// //set the lines to be printed to the lcd
+	// for(int j = 0; j<16; j++){
+	// 	cpr_line_1[j]=cpr_screen_text[cpr_screen_index][j];
+	// 	cpr_line_2[j]=cpr_screen_text[cpr_screen_index+1][j+16];
+	// }
+	lcd_clear();
+	lcd_put_cur(0, 0)
+	lcd_send_string(cpr_screen_text[cpr_screen_index]);
+	lcd_put_cur(1, 0);
+	lcd_send_string(cpr_screen_text[cpr_screen_index+1]);
 }
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -534,15 +601,15 @@ int main(void)
 	lcd_put_cur(1, 0);
 	lcd_send_string("ALL CLEAR");
 	show_monitor();
-	  HAL_Delay(4000);
-	  show_menu();
-	  HAL_Delay(4000);
-	  show_patient_info();
-	  HAL_Delay(4000);
-	  show_address();
-	  HAL_Delay(4000);
-	  show_cpr();
-	  HAL_Delay(4000);
+	HAL_Delay(4000);
+	//   show_menu();
+	//   HAL_Delay(4000);
+	//   show_patient_info();
+	//   HAL_Delay(4000);
+	//   show_address();
+	//   HAL_Delay(4000);
+	//   show_cpr();
+	//   HAL_Delay(4000);
 	/*#####wait_for_password();*/
 	
 	/* --- Heart rate sensor on I2C3 --- */
@@ -553,6 +620,7 @@ int main(void)
 	Oxi_Start(&hi2c3); /* the module only measures after this command */
 	hist_reset(&s_hr_hist);
 	HAL_Delay(1000);
+	AppState app_state = APP_MONITORING;
   /* USER CODE END 2 */
 
   /* Initialize leds */
@@ -563,81 +631,165 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  OxiReading rd;
-  char line1[17], line2[17];
-  char prev1[17] = "", prev2[17] = "";
+//   OxiReading rd;    //Don't think we need this
+//   char line1[17], line2[17];
+//   char prev1[17] = "", prev2[17] = "";
   uint8_t spin = 0;
 
-//  while (1)
-//  {
-//
-//    /* USER CODE END WHILE */
-//
-//    /* USER CODE BEGIN 3 */
-//	char key = Keypad_Scan();
-//	Pane_Task();
-//	uint8_t pressed = Panel_GetPressed();
-//
-//	if (pressed != 0u && app_state == APP_MONITORING) {
-//		add_event_code("MANUAL");
-//		event_flags |= EVENT_MANUAL;
-//	}
-//
-//	if (time_to_read_oximeter() && app_state == APP_MONITORING) {
-//		OxiReading reading;
-//
-//		if (Oxi_Read(&reading) == HAL_OK) {
-//			update_irregularity(reading.heartbeat);
-//
-//			if (accident_detected()) {
-//				enter_alert_state();
-//			}
-//			// Handle read error
-//		}
-//	}
-//
-//	switch (app_state) {
-//	// case APP_WAIT_START:
-//	// 	// Handle wait start state
-//	// 	break; // I don't think we need this because the function for it already happens in main, before the while.
-//
-//	case APP_MONITORING:
-//		// Handle monitoring state
-//		show_monitor();
-//		break;
-//
-//	case APP_ALERT:
-//		// Handle alert state
-//		update_alert_display();
-//		update_alert_leds();
-//		handle_alert_key(key);
-//		break;
-//
-//	case APP_MENU:
-//		// Handle menu state
-//		show_menu();
-//		break;
-//
-//	case APP_STAT:
-//		// Handle stat state
-//		show_stat();
-//		break;
-//
-//	case APP_PATIENT_INFO:
-//		// Handle patient info state
-//		show_patient_info();
-//		break;
-//
-//	case APP_ADDRESS:
-//		// Handle address state
-//		show_address();
-//		break;
-//
-//	case APP_CPR:
-//		// Handle CPR state
-//		show_cpr();
-//		break;
-//	}
+ while (1)
+ {
+
+   /* USER CODE END WHILE */
+
+   /* USER CODE BEGIN 3 */
+	char key = Keypad_Scan();
+	Panel_Task();
+
+	if ((HAL_GPIO_ReadPin(BTN_PORT[0], BTN_MASK[0]) == GPIO_PIN_RESET) && app_state == APP_MONITORING) {
+		event_flags |= EVENT_MANUAL;
+	}
+
+	// if (time_to_read_oximeter() && app_state == APP_MONITORING) { //I think this can just go in the case for monitoring
+	// 	OxiReading reading;
+
+	// 	if (Oxi_Read(&reading) == HAL_OK) {
+	// 		update_irregularity(reading.heartbeat);
+
+	// 		if (accident_detected()) {
+	// 			enter_alert_state();
+	// 		}
+	// 		// Handle read error
+	// 	}
+	// }
+
+// MAIN CASE MAIN CASE MAIN CASE MAIN CASE //
+	switch (app_state) {
+	// case APP_WAIT_START:
+	// 	// Handle wait start state
+	// 	break; // I don't think we need this because the function for it already happens in main, before the while.
+
+	case APP_MONITORING:
+		// Handle monitoring state
+		if (accident_detected()) {
+			enter_alert_state();
+		}
+		if (time_to_read_oximeter()) {
+		OxiReading reading;
+
+		if (Oxi_Read(&reading) == HAL_OK) {
+			update_irregularity(reading.heartbeat);
+
+			
+			// Handle read error
+		}
+		else {
+			AppState = APP_NO_FINGER_WARNING;
+		}
+		}
+		show_monitor();
+		break;
+
+	case APP_NO_FINGER_WARNING:
+		// Handle no finger warning state
+
+		show_no_finger_warning();
+		AppsState = APP_MONITORING;
+		break;
+	
+		case APP_ALERT:
+		// Handle alert state
+		update_alert_display();
+		update_alert_leds();
+		handle_alert_key(key);
+		break;
+
+	case APP_MENU:
+		// Handle menu state
+		show_menu();
+		break;
+
+	case APP_STAT:
+		// Handle stat state
+		if (Keypad_Scan() == '#') {
+			app_state = APP_MENU;
+		}
+		else {
+			show_stat();
+		}
+		break;
+
+	case APP_PATIENT_INFO:
+		// Handle patient info state
+		if (Keypad_Scan() == '#') {
+			app_state = APP_MENU;
+		}
+		else {
+			show_patient_info();
+		}
+		break;
+
+	case APP_ADDRESS:
+		// Handle address state
+		if (Keypad_Scan() == '#') {
+			app_state = APP_MENU;
+		}
+		else {
+			show_address();
+		}
+		break;
+
+	case APP_CPR:
+		// Handle CPR state
+		uint32_t now_time = HAL_GetTick();
+
+		if (Keypad_Scan() == '#') {
+			app_state = APP_MENU;
+			break;
+		}
+		switch (cpr_phase) {
+			case CPR_COMPRESS:
+				if (now_time - cpr_phase_start_ms >= 450u) {
+					cpr_leds(0);
+					cpr_phase = CPR_RELAX;
+					cpr_phase_start_ms = now_time;
+					cpr_compressions_since_breath++;
+					if (cpr_compressions_since_breath >= 5u) {
+						cpr_phase = CPR_BREATH;
+						cpr_phase_start_ms = now_time;
+						cpr_breath_screen_active = 1u;
+						cpr_compressions_since_breath = 0u;
+					}
+				}
+				else {
+					cpr_leds(1);
+				}
+				break;
+			
+			case CPR_RELAX:
+				if (now_time - cpr_phase_start_ms >= 150u) {
+					cpr_phase = CPR_COMPRESS;
+					cpr_phase_start_ms = now_time;
+				}
+				else {
+					cpr_leds(0);
+				}
+				break;
+
+			case CPR_BREATHE:
+				if (now_time - cpr_phase_start_ms >= 2500u) {
+					cpr_phase = CPR_COMPRESS;
+					cpr_phase_start_ms = now_time;
+					cpr_breath_screen_active = 0u;
+					cpr_screen_switch_ms = now_time;
+				}
+				else {
+					cpr_set_leds(1);
+				}
+				break;
+		}
+		show_cpr();
+		break;
+	}
 //
 //	//   uint8_t ok;
 //	//   float temp;
@@ -674,9 +826,9 @@ int main(void)
 //	//   }
 //	//   }
 //  /* USER CODE END 3 */
-//	}
-//}
+	}
 }
+
 /**
   * @brief System Clock Configuration
   * @retval None

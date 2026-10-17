@@ -256,23 +256,28 @@ static uint8_t cpr_compressions_since_breath = 0u;
 
 static const char *cpr_screen_text[6] = {
 	"COMPRESS IN TIME"
-	"WITH LIGHTS",
-	"CALL 000 IF CPR",
-	"NEEDED",
-	"PRESS # TO GO",
-	"BACK"
+	"WITH LIGHTS     ",
+	"CALL 000 IF CPR ",
+	"NEEDED          ",
+	"PRESS # TO GO   ",
+	"BACK            "
 };
 static const char *cpr_breath_screen_text1 = "BREATHE 2 RESCUE";
-static const char *cpr_breath_screen_text2 "BREATHS";
-static const char monitor_line_1[16] = "All Clear";
-static const char monitor_line_2[16] = "System Idle...";
-static const char warning_line_1[16] = "No Finger Found";
-static const char warning_line_2[16] = "Place on Finger";
-static const char menu_line_1[16] = "1.STAT 2.P.INFO";
-static const char menu_line_2[16] = "3.ADDR 4.CPR";
+static const char *cpr_breath_screen_text2 "BREATHS         ";
+static const char monitor_line_1[16] = "All Clear       ";
+static const char monitor_line_2[16] = "System Idle...  ";
+static const char warning_line_1[16] = "No Finger Found ";
+static const char warning_line_2[16] = "Place on Finger ";
+static const char menu_line_1[16] = "1.STAT 2.P.INFO ";
+static const char menu_line_2[16] = "3.ADDR 4.CPR    ";
 static const char patient_name[16] = "Stanley Leichter";
-static const char patient_age[7] = "AGE: 68";
-static const char full_address[32] = "Bldg 420, 3/Kent St, Bentley";
+static const char patient_age[7] = "         AGE: 68";
+static const char address_line_1[16] = "Bldg 420, 3 Kent";
+static const char address_line_2[16] = "St, Bentley     "
+static uint32_t time_at_last_readms = 0;
+static const uint32_t OXIMETER_POLL_DELAYms = 10;
+static char prev1[16] = "                ";
+static char prev2[16] = "                ";
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -299,9 +304,23 @@ static void wait_for_start(void) {
 	}
 }
 
+static bool time_to_read_oximeter(uint32_t now_time) {
+	if (now_time - time_at_last_readms == OXIMETER_POLL_DELAYms) {
+		time_at_last_readms = now_time;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
 static bool accident_detected(void) {
+	if (reading.heartbeat > 100 || reading.heartbeat < 55) {
+		event_flags |= EVENT_IRREGULAR;
+	}
 	return (event_flags != EVENT_NONE);
 }
+
 static void clear_event_codes(void) {
 	event_flags = EVENT_NONE;
 }
@@ -438,34 +457,42 @@ HAL_Delay(PIN_SCAN_MS);
 * their current heart rate and SpO2 and so on */
 // SHOW ZONE SHOW ZONE SHOW ZONE SHOW ZONE SHOW ZONE //
 
+static void printer_l1(char[16] fresh_line) {
+	if (strncmp(prev1, fresh_line, 16) != 0) {
+		lcd_put_cur(0, 0);
+		lcd_send_string(fresh_line);
+		strncpy(prev1, fresh_line, sizeof(prev1));
+	}
+}
+
+static void printer_l2(char fresh_line) {
+	if (strncmp(prev2, fresh_line, 16) != 0) {
+		lcd_put_cur(1, 0);
+		lcd_send_string(fresh_line);
+		strncpy(prev2, fresh_line, sizeof(prev2));
+	}
+}
+
 static void show_monitor(void) {
 	// show monitor code
-	char monitor_line_1[16] = "All Clear";
-	char monitor_line_2[16] = "System Idle...";
-	lcd_clear();
-	lcd_put_cur(0,0);
-	lcd_send_string(monitor_line_1);
-	lcd_put_cur(1,0);
-	lcd_send_string(monitor_line_2);
+	printer_l1(monitor_line_1);
+	printer_l2(monitor_line_2);
 	
 }
 
 static void show_no_finger_warning(void) {
 	// show no finger warning code
-	lcd_clear();
-	lcd_put_cur(0,0);
-	lcd_send_string(warning_line_1);
+	printer_l1(warning_line_1);
 	lcd_put_cur(1,0);
-	lcd_send_string(warning_line_2);
+	printer_l2(warning_line_2);
 }
 
 static void show_menu(void) {
 	// show menu code
-	lcd_clear();
 	lcd_put_cur(0,0);
-	lcd_send_string(menu_line_1);
+	printer_l1(menu_line_1);
 	lcd_put_cur(1,0);
-	lcd_send_string(menu_line_2);
+	printer_l2(menu_line_2);
 }
 
 static void show_stat(void) {
@@ -475,29 +502,20 @@ static void show_stat(void) {
 
 static void show_patient_info(void) {
 	// show patient info code
-	lcd_clear();
 	lcd_put_cur(0,0);
-	lcd_send_string(patient_name);
-	lcd_put_cur(1,9); //Goddamn loser
-	lcd_send_string(patient_age);
+	printer_l1(patient_name);
+	lcd_put_cur(1,0); //Goddamn loser
+	printer_l2(patient_age);
 }
 
 static void show_address(void) {
 	// show address code
 	// attempting to code it better
 	// for loop logic worked in an external editor
-
-	char address_line_1[17];
-	char address_line_2[17];
-	for(int i = 0; i<16; i++){
-		address_line_1[i]=full_address[i];
-		address_line_2[i]=full_address[i+16];
-	}
-	lcd_clear();
-	lcd_put_cur(0, 0);
-	lcd_send_string(address_line_1);
-	lcd_put_cur(1, 0);
-	lcd_send_string(address_line_2);
+	lcd_put_cur(0,0);
+	printer_l1(address_line_1);
+	lcd_put_cur(1,0);
+	printer_l2(address_line_2);
 }
 
 static void show_cpr(void) {
@@ -670,6 +688,7 @@ int main(void)
 
 	case APP_MONITORING:
 		// Handle monitoring state
+		uint32_t now_time = HAL_GetTick()
 		if (accident_detected()) {
 			enter_alert_state();
 		}
@@ -683,7 +702,7 @@ int main(void)
 			// Handle read error
 		}
 		else {
-			AppState = APP_NO_FINGER_WARNING;
+			app_state = APP_NO_FINGER_WARNING;
 		}
 		}
 		show_monitor();
@@ -693,7 +712,7 @@ int main(void)
 		// Handle no finger warning state
 
 		show_no_finger_warning();
-		AppsState = APP_MONITORING;
+		app_state = APP_MONITORING;
 		break;
 	
 		case APP_ALERT:
@@ -704,8 +723,22 @@ int main(void)
 		break;
 
 	case APP_MENU:
-		// Handle menu state
-		show_menu();
+		// Handle menu 
+		if (Keypad_Scan() == "1") {
+			app_state = APP_STAT;
+		}
+		else if (Keypad_Scan() == "2") {
+			app_state = APP_PATIENT_INFO;
+		}
+		else if (Keypad_Scan() == "3") {
+			app_state = APP_ADDRESS;;
+		}
+		else if (Keypad_Scan() == "4") {
+			app_state = APP_CPR;
+		}
+		else {
+			show_menu();
+		}
 		break;
 
 	case APP_STAT:

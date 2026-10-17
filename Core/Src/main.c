@@ -255,29 +255,34 @@ static uint8_t cpr_breath_screen_active = 0;
 static uint8_t cpr_compressions_since_breath = 0u;
 
 static const char *cpr_screen_text[6] = {
-	"COMPRESS IN TIME"
+	"COMPRESS IN TIME",
 	"WITH LIGHTS     ",
 	"CALL 000 IF CPR ",
 	"NEEDED          ",
 	"PRESS # TO GO   ",
 	"BACK            "
 };
-static const char *cpr_breath_screen_text1 = "BREATHE 2 RESCUE";
-static const char *cpr_breath_screen_text2 "BREATHS         ";
-static const char monitor_line_1[16] = "All Clear       ";
-static const char monitor_line_2[16] = "System Idle...  ";
-static const char warning_line_1[16] = "No Finger Found ";
-static const char warning_line_2[16] = "Place on Finger ";
-static const char menu_line_1[16] = "1.STAT 2.P.INFO ";
-static const char menu_line_2[16] = "3.ADDR 4.CPR    ";
-static const char patient_name[16] = "Stanley Leichter";
-static const char patient_age[7] = "         AGE: 68";
-static const char address_line_1[16] = "Bldg 420, 3 Kent";
-static const char address_line_2[16] = "St, Bentley     "
+static const char cpr_breath_screen_text1[17] = "BREATHE 2 RESCUE";
+static const char cpr_breath_screen_text2[17] = "BREATHS         ";
+static const char monitor_line_1[17] = "All Clear       ";
+static const char monitor_line_2[17] = "System Idle...  ";
+static const char warning_line_1[17] = "No Finger Found ";
+static const char warning_line_2[17] = "Place on Finger ";
+static const char menu_line_1[17] = "1.STAT 2.P.INFO ";
+static const char menu_line_2[17] = "3.ADDR 4.CPR    ";
+static const char patient_name[17] = "Stanley Leichter";
+static const char patient_age[17] = "         AGE: 68";
+static const char address_line_1[17] = "Bldg 420, 3 Kent";
+static const char address_line_2[17] = "St, Bentley     "
 static uint32_t time_at_last_readms = 0;
 static const uint32_t OXIMETER_POLL_DELAYms = 10;
-static char prev1[16] = "                ";
-static char prev2[16] = "                ";
+static char prev1[17] = "                ";
+static char prev2[17] = "                ";
+static const char alert_line_1[17] = "EMERGENCY! ENTER";
+static const char alert_line_2[17] = "AND ASSIST!     ";
+static uint8_t stat_message_index = 0;
+static const char stat_manual[17] = "MANUAL ACTIVATED";
+static const char stat_heart[17] = "PULSE UNUSUAL   ";
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -314,7 +319,7 @@ static bool time_to_read_oximeter(uint32_t now_time) {
 	}
 }
 
-static bool accident_detected(void) {
+static bool accident_detected(OxiReading reading) {
 	if (reading.heartbeat > 100 || reading.heartbeat < 55) {
 		event_flags |= EVENT_IRREGULAR;
 	}
@@ -328,6 +333,14 @@ static void clear_event_codes(void) {
 static void cpr_leds(uint8_t on) {
 	Panel_SetLed(2, on);
 	Panel_SetLed(3, on);
+}
+
+static void stat_builder(char *l1) {
+	int sp02 = (s_spo2_show > 0 && s_spo2_shown <= 100) ?
+				(int) s_spo2_shown : 0;
+	int hr = (s_hr_shown > 0 && s_hr_shown <= 999) ? (int) s_hr_shown : 0;
+	snprintf(l1, 17, "SpO2%3d%% HR%3d", sp02, hr);
+	pad16(l1);
 }
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -480,31 +493,34 @@ static void show_monitor(void) {
 	
 }
 
+static void show_alert(void) {
+	// show alert screen code
+	printer_l1(alert_line_1);
+	printer_l2(alert_line_2);
+}
+
 static void show_no_finger_warning(void) {
 	// show no finger warning code
 	printer_l1(warning_line_1);
-	lcd_put_cur(1,0);
 	printer_l2(warning_line_2);
 }
 
 static void show_menu(void) {
 	// show menu code
-	lcd_put_cur(0,0);
 	printer_l1(menu_line_1);
-	lcd_put_cur(1,0);
 	printer_l2(menu_line_2);
 }
 
-static void show_stat(void) {
+static void show_stat(char *line2, char *line2) {
 	// show stat code
-
+	stat_builder(line1);
+	printer_l1(line1);
+	printer_l2(line2);
 }
 
 static void show_patient_info(void) {
 	// show patient info code
-	lcd_put_cur(0,0);
-	printer_l1(patient_name);
-	lcd_put_cur(1,0); //Goddamn loser
+	printer_l1(patient_name); //Goddamn loser
 	printer_l2(patient_age);
 }
 
@@ -512,9 +528,7 @@ static void show_address(void) {
 	// show address code
 	// attempting to code it better
 	// for loop logic worked in an external editor
-	lcd_put_cur(0,0);
 	printer_l1(address_line_1);
-	lcd_put_cur(1,0);
 	printer_l2(address_line_2);
 }
 
@@ -545,7 +559,7 @@ static void show_cpr(void) {
 	// 	cpr_line_2[j]=cpr_screen_text[cpr_screen_index+1][j+16];
 	// }
 	lcd_clear();
-	lcd_put_cur(0, 0)
+	lcd_put_cur(0, 0);
 	lcd_send_string(cpr_screen_text[cpr_screen_index]);
 	lcd_put_cur(1, 0);
 	lcd_send_string(cpr_screen_text[cpr_screen_index+1]);
@@ -590,9 +604,9 @@ int main(void)
 	/* --- LCD on I2C1 --- */
 	lcd_init(&hi2c1);
 	lcd_put_cur(0, 0);
-	lcd_send_string("BOOT SYSTEM?");
+	lcd_send_string("BOOT SYSTEM?    ");
 	lcd_put_cur(1, 0);
-	lcd_send_string("1. YES");
+	lcd_send_string("1. YES          ");
 	/* --- Keypad: the PIN gate comes first ---
 	 * Placed before the sensor is started, so nothing is acquired until the
 	 * PIN is accepted and the sensor LEDs stay dark while unauthorised. */
@@ -610,26 +624,18 @@ int main(void)
 	Panel_SetLed(3, 0);
 	wait_for_start();
 	lcd_put_cur(0, 0);
-	lcd_send_string("BOOTING...");
+	lcd_send_string("BOOTING...      ");
 	lcd_put_cur(1, 0);
 	lcd_send_string("");
 	HAL_Delay(1000);
 	lcd_put_cur(0, 0);
-	lcd_send_string("SYSTEM IDLE");
+	lcd_send_string("SYSTEM IDLE     ");
 	lcd_put_cur(1, 0);
-	lcd_send_string("ALL CLEAR");
+	lcd_send_string("ALL CLEAR       ");
 	show_monitor();
 	HAL_Delay(4000);
-	//   show_menu();
-	//   HAL_Delay(4000);
-	//   show_patient_info();
-	//   HAL_Delay(4000);
-	//   show_address();
-	//   HAL_Delay(4000);
-	//   show_cpr();
-	//   HAL_Delay(4000);
-	/*#####wait_for_password();*/
 	
+
 	/* --- Heart rate sensor on I2C3 --- */
 	{
 		uint8_t addr = Oxi_ScanBus(&hi2c3); /* break here; expect 0xAE */
@@ -650,9 +656,8 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 //   OxiReading rd;    //Don't think we need this
-//   char line1[17], line2[17];
+   char statline1[17] = "";
 //   char prev1[17] = "", prev2[17] = "";
-  uint8_t spin = 0;
 
  while (1)
  {
@@ -667,43 +672,30 @@ int main(void)
 		event_flags |= EVENT_MANUAL;
 	}
 
-	// if (time_to_read_oximeter() && app_state == APP_MONITORING) { //I think this can just go in the case for monitoring
-	// 	OxiReading reading;
-
-	// 	if (Oxi_Read(&reading) == HAL_OK) {
-	// 		update_irregularity(reading.heartbeat);
-
-	// 		if (accident_detected()) {
-	// 			enter_alert_state();
-	// 		}
-	// 		// Handle read error
-	// 	}
-	// }
+	
 
 // MAIN CASE MAIN CASE MAIN CASE MAIN CASE //
 	switch (app_state) {
-	// case APP_WAIT_START:
-	// 	// Handle wait start state
-	// 	break; // I don't think we need this because the function for it already happens in main, before the while.
-
+	
 	case APP_MONITORING:
 		// Handle monitoring state
 		uint32_t now_time = HAL_GetTick()
-		if (accident_detected()) {
-			enter_alert_state();
+		if (event_flags != EVENT_NONE) {
+			app_state = APP_MENU;
+			show_alert();
+			break;
 		}
 		if (time_to_read_oximeter()) {
-		OxiReading reading;
+			OxiReading reading;
 
-		if (Oxi_Read(&reading) == HAL_OK) {
-			update_irregularity(reading.heartbeat);
-
-			
-			// Handle read error
-		}
-		else {
-			app_state = APP_NO_FINGER_WARNING;
-		}
+			if (Oxi_Read(&reading) == HAL_OK) {
+				accident_detected(reading);
+				
+				// Handle read error
+			}
+			else {
+				app_state = APP_NO_FINGER_WARNING;
+			}
 		}
 		show_monitor();
 		break;
@@ -724,18 +716,10 @@ int main(void)
 
 	case APP_MENU:
 		// Handle menu 
-		if (Keypad_Scan() == "1") {
-			app_state = APP_STAT;
-		}
-		else if (Keypad_Scan() == "2") {
-			app_state = APP_PATIENT_INFO;
-		}
-		else if (Keypad_Scan() == "3") {
-			app_state = APP_ADDRESS;;
-		}
-		else if (Keypad_Scan() == "4") {
-			app_state = APP_CPR;
-		}
+		if (Keypad_Scan() == "1") app_state = APP_STAT;
+		else if (Keypad_Scan() == "2") app_state = APP_PATIENT_INFO;
+		else if (Keypad_Scan() == "3") app_state = APP_ADDRESS;
+		else if (Keypad_Scan() == "4") app_state = APP_CPR;
 		else {
 			show_menu();
 		}
@@ -746,8 +730,19 @@ int main(void)
 		if (Keypad_Scan() == '#') {
 			app_state = APP_MENU;
 		}
-		else {
-			show_stat();
+		
+		const char statline2[16];
+		if ((event_flags & EVENT_MANUAL) != 0u) statline2 = stat_manual;
+		else if ((event_flags & EVENT_IRREGULAR) != 0u) statline2 = stat_heart;
+		if (time_to_read_oximeter()) {
+			OxiReading reading;
+			if (Oxi_Read(&reading) == HAL_OK) {
+				
+				show_stat(statline2);
+			}
+			else {
+				show_no_finger_warning();
+			}
 		}
 		break;
 
@@ -823,41 +818,7 @@ int main(void)
 		show_cpr();
 		break;
 	}
-//
-//	//   uint8_t ok;
-//	//   float temp;
-//	//   DispState st;
-//	//   ok = (Oxi_Read(&rd) == HAL_OK) ? 1u : 0u;
-//	//   temp = ok ? Oxi_ReadTemperature() : -100.0f;
-//	//   st = ok ? hr_step(rd.heartbeat, rd.spo2) : ST_NO_FINGER;
-//	//   build_lines(st, ok, temp, spin, line1, line2);
-//	//   /* Write to the LCD only when the text actually changed. This is what
-//	//   * makes fast polling practical: the screen may stay still for seconds,
-//	//   * so there is no flicker and almost no traffic on I2C1. */
-//	//   if (strncmp(prev1, line1, 16) != 0) {
-//	//   lcd_put_cur(0, 0);
-//	//   lcd_send_string(line1);
-//	//   strncpy(prev1, line1, sizeof(prev1));
-//	//   }
-//	//   if (strncmp(prev2, line2, 16) != 0) {
-//	//   lcd_put_cur(1, 0);
-//	//   lcd_send_string(line2);
-//	//   strncpy(prev2, line2, sizeof(prev2));
-//	//   }
-//	//   spin++;
-//	//   /* The heart rate display only needs refreshing every 250 ms, but the
-//	//   * buttons must be polled far more often to feel responsive. So the wait
-//	//   * is split into 10 ms slices with a button scan in each. Pressing
-//	//   * BUTTONn toggles LEDn without disturbing the readings. */
-//	//   {
-//	//   uint16_t t;
-//	//   for (t = 0; t < (POLL_MS / PANEL_TICK_MS); t++)
-//	//   {
-//	//   Panel_Task();
-//	//   HAL_Delay(PANEL_TICK_MS);
-//	//   }
-//	//   }
-//	//   }
+ 
 //  /* USER CODE END 3 */
 	}
 }
